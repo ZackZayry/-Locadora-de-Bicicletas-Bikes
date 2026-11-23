@@ -1,0 +1,3442 @@
+{
+  "info": {
+    "name": "Bikes - Passo a passo (testes no Postman)",
+    "description": "Coleção para testar a API inteira só no Postman, na ordem das pastas A a G. Cada requisição tem testes (aba Tests) que conferem o código HTTP esperado, inclusive os erros (403, 409, 422...), então o Runner mostra tudo verde quando o sistema está correto.\n\nCOMO USAR\n1) Suba a API (http://localhost:8080) e o banco.\n2) UMA vez no MySQL: UPDATE bikes.usuarios SET role = 'ROLE_ADMIN' WHERE username = 'admin@bikes.com';\n   (se o admin ainda não existe, rode a pasta A antes: ela cria o usuário.)\n3) Clique com o botão direito na coleção > Run collection > Run (mantenha 'Keep variable values' marcado).\n\nOs dados (usuário, CPF, códigos das bicicletas) são gerados de novo a cada execução, então a coleção pode ser rodada quantas vezes quiser. Para executar uma requisição isolada, rode antes as anteriores: os ids e tokens ficam em variáveis da coleção.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// devolução prevista sempre no futuro (agora + 5h; o servidor usa horário de Brasília)",
+          "const d = new Date(Date.now() + 5 * 3600 * 1000);",
+          "pm.collectionVariables.set('prevista', d.toISOString().slice(0, 19));"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "A - Preparação (admin)",
+      "description": "Cria/loga o ADMIN e confere se ele já foi promovido no banco. Se a checagem A3 falhar (403), rode no MySQL:\nUPDATE bikes.usuarios SET role = 'ROLE_ADMIN' WHERE username = 'admin@bikes.com';\ne rode a coleção de novo.",
+      "item": [
+        {
+          "name": "A1 - Criar usuário ADMIN (201, ou 409 se já existir)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin@bikes.com\",\n  \"password\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 criado ou 409 já existe\", function () {",
+                  "    pm.expect([201, 409].includes(pm.response.code), 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const run = Date.now().toString().slice(-8);",
+                  "pm.collectionVariables.set('runId', run);",
+                  "pm.collectionVariables.set('demoUser', `demo.${run}@email.com`);",
+                  "pm.collectionVariables.set('demoPass', '123456');",
+                  "pm.collectionVariables.set('cpfDemo', Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join(''));",
+                  "pm.collectionVariables.set('codigo1', `DEMO-${run}-1`);",
+                  "pm.collectionVariables.set('codigo2', `DEMO-${run}-2`);",
+                  "pm.collectionVariables.set('codigo3', `DEMO-${run}-3`);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A2 - Login ADMIN (salva tokenAdmin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin@bikes.com\",\n  \"password\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 login ok\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('veio um token', () => pm.expect(j.token).to.be.a('string'));",
+                  "    pm.collectionVariables.set('tokenAdmin', j.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A3 - Checar se o ADMIN foi promovido (deve dar 200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 - ADMIN promovido (se 403, rode o SQL da descrição da pasta A)\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    const adm = j.find(u => u.username === 'admin@bikes.com');",
+                  "    if (adm) { pm.collectionVariables.set('adminId', adm.id); }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B - Usuário, login e senha",
+      "item": [
+        {
+          "name": "B1 - Sem token: listar clientes (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 sem autenticação\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B2 - Criar usuário cliente de demonstração (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{demoUser}}\",\n  \"password\": \"{{demoPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 criado\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('usuarioIdDemo', j.id);",
+                  "    pm.test('senha nunca volta na resposta', () => pm.expect(j.password).to.be.undefined);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B3 - Usuário com senha de 3 caracteres (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"invalido.{{runId}}@email.com\",\n  \"password\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 validação (senha deve ter 6 caracteres)\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B4 - Usuário duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{demoUser}}\",\n  \"password\": \"{{demoPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 username único\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B5 - Login com senha errada (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{demoUser}}\",\n  \"password\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 credenciais inválidas\", function () {",
+                  "    pm.expect(pm.response.code === 400, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B6 - Login do cliente (salva tokenCliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{demoUser}}\",\n  \"password\": \"{{demoPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 login ok\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('tokenCliente', j.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B7 - Cliente consulta o próprio usuário (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdDemo}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 o próprio usuário\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('é o usuário certo', () => pm.expect(j.username).to.eql(pm.collectionVariables.get('demoUser')));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B8 - Cliente consulta o usuário do ADMIN (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{adminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{adminId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só o próprio usuário ou ADMIN\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B9 - Cliente tenta listar usuários (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN lista\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B10 - Alterar senha com a senha atual errada (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdDemo}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"999999\",\n  \"novaSenha\": \"654321\",\n  \"confirmaSenha\": \"654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 senha atual incorreta\", function () {",
+                  "    pm.expect(pm.response.code === 400, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B11 - Alterar senha com confirmação diferente (400)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdDemo}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"{{demoPass}}\",\n  \"novaSenha\": \"654321\",\n  \"confirmaSenha\": \"111111\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 senhas não coincidem\", function () {",
+                  "    pm.expect(pm.response.code === 400, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B12 - Alterar senha corretamente (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdDemo}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"{{demoPass}}\",\n  \"novaSenha\": \"654321\",\n  \"confirmaSenha\": \"654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 senha alterada\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('demoPass', '654321');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B13 - Login com a senha nova (salva tokenCliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{demoUser}}\",\n  \"password\": \"{{demoPass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 login com a nova senha\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('tokenCliente', j.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C - Clientes",
+      "item": [
+        {
+          "name": "C1 - Cliente tenta listar clientes (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN lista\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C2 - ADMIN tenta se cadastrar como cliente (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Admin Teste\",\n  \"cpf\": \"{{cpfDemo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só CLIENTE se cadastra\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C3 - Cadastro com CPF inválido (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Demonstração\",\n  \"cpf\": \"123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 CPF deve ter 11 dígitos\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C4 - Cadastrar-se como cliente (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Demonstração\",\n  \"cpf\": \"{{cpfDemo}}\",\n  \"telefone\": \"47999990000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 cliente cadastrado\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('clienteIdDemo', j.id);",
+                  "    pm.test('vinculado ao usuário logado', () => pm.expect(Number(j.usuarioId)).to.eql(Number(pm.collectionVariables.get('usuarioIdDemo'))));",
+                  "    pm.test('e-mail padrão = username', () => pm.expect(j.email).to.eql(pm.collectionVariables.get('demoUser')));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C5 - Cadastrar de novo o mesmo usuário (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Demonstração\",\n  \"cpf\": \"{{cpfDemo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 um usuário só tem um cadastro\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 - Cliente vê os próprios dados (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 meus dados\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('é o meu cadastro', () => pm.expect(j.nome).to.eql('Cliente Demonstração'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C7 - ADMIN lista todos os clientes (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 lista com o cliente de demonstração\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('contém o cliente criado', () => pm.expect(j.some(c => c.id === Number(pm.collectionVariables.get('clienteIdDemo')))).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C8 - ADMIN busca cliente por id (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteIdDemo}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 cliente encontrado\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C9 - Cliente busca cliente por id (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteIdDemo}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN busca por id\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C10 - ADMIN atualiza o telefone (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteIdDemo}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Demonstração\",\n  \"cpf\": \"{{cpfDemo}}\",\n  \"telefone\": \"47988887777\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 atualizado\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('telefone novo', () => pm.expect(j.telefone).to.eql('47988887777'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "C11 - ADMIN busca cliente inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "999999999"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 não encontrado\", function () {",
+                  "    pm.expect(pm.response.code === 404, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D - Bicicletas (somente ADMIN)",
+      "item": [
+        {
+          "name": "D1 - Cliente tenta criar bicicleta (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo1}}\",\n  \"modelo\": \"Caloi Explorer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D2 - ADMIN cria a bicicleta 1 (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo1}}\",\n  \"modelo\": \"Caloi Explorer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 criada, status DISPONIVEL\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('bikeId1', j.id);",
+                  "    pm.test('nasce DISPONIVEL', () => pm.expect(j.status).to.eql('DISPONIVEL'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D3 - ADMIN cria a bicicleta 2 (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo2}}\",\n  \"modelo\": \"Monark Barra Circular\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 criada\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('bikeId2', j.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D4 - ADMIN cria a bicicleta 3 (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo3}}\",\n  \"modelo\": \"Sense Impact\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 criada\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('bikeId3', j.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D5 - Código duplicado (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo1}}\",\n  \"modelo\": \"Outro\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 código único\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D6 - Código em branco (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"\",\n  \"modelo\": \"Caloi Explorer\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 validação\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D7 - Buscar pelo código (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/codigo/{{codigo1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "codigo",
+                "{{codigo1}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 encontrada pelo código\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('é a bicicleta 1', () => pm.expect(j.id).to.eql(Number(pm.collectionVariables.get('bikeId1'))));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D8 - Buscar código inexistente (404)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/codigo/NAO-EXISTE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "codigo",
+                "NAO-EXISTE"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 não encontrada\", function () {",
+                  "    pm.expect(pm.response.code === 404, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D9 - Listar bicicletas disponíveis (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/disponiveis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "disponiveis"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 lista de disponíveis\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('inclui a bicicleta 1', () => pm.expect(j.some(b => b.codigo === pm.collectionVariables.get('codigo1'))).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D10 - ADMIN atualiza o modelo da bicicleta 1 (200)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/{{bikeId1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "{{bikeId1}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"{{codigo1}}\",\n  \"modelo\": \"Caloi Explorer 2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 atualizada (status não muda)\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('modelo novo', () => pm.expect(j.modelo).to.eql('Caloi Explorer 2026'));",
+                  "    pm.test('continua DISPONIVEL', () => pm.expect(j.status).to.eql('DISPONIVEL'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D11 - Enviar a bicicleta 3 para manutenção (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/{{bikeId3}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "{{bikeId3}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"MANUTENCAO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 em MANUTENCAO\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('MANUTENCAO', () => pm.expect(j.status).to.eql('MANUTENCAO'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D12 - Tentar definir status ALUGADA manualmente (409)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/{{bikeId1}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "{{bikeId1}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ALUGADA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 ALUGADA só pela locação\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E - Locações (aluguel)",
+      "item": [
+        {
+          "name": "E1 - Alugar bicicleta em manutenção (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId3}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 bicicleta indisponível\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2 - Cartão vencido (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"01/20\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 cartão vencido\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E3 - Número de cartão inválido (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"1234567890123456\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 cartão inválido\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E4 - Devolução prevista no passado (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"2020-01-01T10:00:00\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 data deve estar no futuro\", function () {",
+                  "    pm.expect(pm.response.code === 422, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E5 - ADMIN tenta solicitar aluguel (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só CLIENTE aluga\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E6 - Cliente aluga a bicicleta 1 (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 locação criada\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('locacaoId1', j.id);",
+                  "    pm.test('status ATIVA', () => pm.expect(j.status).to.eql('ATIVA'));",
+                  "    pm.test('só os 4 últimos dígitos do cartão', () => pm.expect(j.cartaoFinal).to.eql('1111'));",
+                  "    pm.test('registrou a retirada', () => pm.expect(j.dataHoraRetirada).to.be.a('string'));",
+                  "    pm.test('ainda sem devolução efetiva', () => pm.expect(j.dataHoraDevolucaoEfetiva).to.be.null);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E7 - A bicicleta 1 agora está ALUGADA (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/codigo/{{codigo1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "codigo",
+                "{{codigo1}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('status ALUGADA', () => pm.expect(j.status).to.eql('ALUGADA'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E8 - Alugar a mesma bicicleta de novo (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId1}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 duas locações simultâneas não são permitidas\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E9 - Aluguel sem bicicletaId: o sistema escolhe a primeira disponível (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 escolheu uma bicicleta disponível\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('locacaoId2', j.id);",
+                  "    pm.collectionVariables.set('bikeIdAuto', j.bicicletaId);",
+                  "    pm.test('status ATIVA', () => pm.expect(j.status).to.eql('ATIVA'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E10 - ADMIN lista as locações (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 lista\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('contém a locação 1', () => pm.expect(j.some(l => l.id === Number(pm.collectionVariables.get('locacaoId1')))).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E11 - ADMIN lista as locações do cliente (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes?clienteId={{clienteIdDemo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ],
+              "query": [
+                {
+                  "key": "clienteId",
+                  "value": "{{clienteIdDemo}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 só as do cliente\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('todas do cliente', () => pm.expect(j.every(l => l.clienteId === Number(pm.collectionVariables.get('clienteIdDemo')))).to.be.true);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E12 - ADMIN busca locação por id (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId1}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 encontrada\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E13 - Cliente tenta listar locações (403)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN lista\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "F - Devoluções",
+      "item": [
+        {
+          "name": "F1 - Cliente tenta registrar devolução (403)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId1}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId1}}",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 só ADMIN registra devolução\", function () {",
+                  "    pm.expect(pm.response.code === 403, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F2 - ADMIN devolve a locação 1 (200): tempo e valor a debitar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId1}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId1}}",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 devolução registrada\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('FINALIZADA', () => pm.expect(j.status).to.eql('FINALIZADA'));",
+                  "    pm.test('data/hora efetiva registrada', () => pm.expect(j.dataHoraDevolucaoEfetiva).to.be.a('string'));",
+                  "    pm.test('tempo de utilização calculado', () => pm.expect(j.minutosUtilizados).to.be.a('number'));",
+                  "    pm.test('valor mínimo de 1 hora (R$ 10,00)', () => pm.expect(Number(j.valorTotal)).to.eql(10));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F3 - A bicicleta 1 voltou a DISPONIVEL (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/codigo/{{codigo1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "codigo",
+                "{{codigo1}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('DISPONIVEL', () => pm.expect(j.status).to.eql('DISPONIVEL'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F4 - Devolver a mesma locação de novo (409)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId1}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId1}}",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 já devolvida\", function () {",
+                  "    pm.expect(pm.response.code === 409, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F5 - ADMIN devolve a locação 2 (a do aluguel automático) (200)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId2}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId2}}",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 devolvida\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('FINALIZADA', () => pm.expect(j.status).to.eql('FINALIZADA'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F6 - Cliente aluga a bicicleta 2 para testar devolução com problema (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bicicletaId\": {{bikeId2}},\n  \"dataHoraPrevistaDevolucao\": \"{{prevista}}\",\n  \"cartao\": {\n    \"titular\": \"MARIA DEMO\",\n    \"numero\": \"4111111111111111\",\n    \"validade\": \"12/30\",\n    \"cvv\": \"123\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201\", function () {",
+                  "    pm.expect(pm.response.code === 201, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.collectionVariables.set('locacaoId3', j.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F7 - ADMIN devolve a locação 3 COM problema (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/{{locacaoId3}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "{{locacaoId3}}",
+                "devolucao"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"problema\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 devolvida\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('FINALIZADA', () => pm.expect(j.status).to.eql('FINALIZADA'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F8 - A bicicleta 2 foi para MANUTENCAO (200)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/codigo/{{codigo2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "codigo",
+                "{{codigo2}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('MANUTENCAO', () => pm.expect(j.status).to.eql('MANUTENCAO'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F9 - ADMIN libera a bicicleta 2 depois do reparo (200)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas/{{bikeId2}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas",
+                "{{bikeId2}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DISPONIVEL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 liberada\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});",
+                  "let j = null;",
+                  "try { j = pm.response.json(); } catch (e) {}",
+                  "if (pm.response.code < 300 && j !== null) {",
+                  "    pm.test('DISPONIVEL', () => pm.expect(j.status).to.eql('DISPONIVEL'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F10 - Devolução com id inválido na URL (400)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/abc/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "abc",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 id inválido\", function () {",
+                  "    pm.expect(pm.response.code === 400, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F11 - Devolução de locação inexistente (404)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes/999999999/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes",
+                "999999999",
+                "devolucao"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 não encontrada\", function () {",
+                  "    pm.expect(pm.response.code === 404, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "G - Conferência final (ADMIN)",
+      "item": [
+        {
+          "name": "G1 - Todas as locações",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/locacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "locacoes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "G2 - Todas as bicicletas (veja os status)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/bicicletas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "bicicletas"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "G3 - Todos os clientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenAdmin}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200\", function () {",
+                  "    pm.expect(pm.response.code === 200, 'status recebido: ' + pm.response.code).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

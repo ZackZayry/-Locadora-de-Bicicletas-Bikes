@@ -1,0 +1,167 @@
+<!-- Created with Jaspersoft Studio version 7.0.8.final using JasperReports Library version 7.0.8-6f896111  -->
+<jasperReport name="test2" language="java" columnCount="1" pageWidth="595" pageHeight="842" orientation="Landscape" columnWidth="555" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="ff14598d-74a8-4366-9ceb-72e08ab114da">
+	<property name="com.jaspersoft.studio.data.sql.tables" value=""/>
+	<property name="com.jaspersoft.studio.data.defaultdataadapter" value="BikesMaven"/>
+	<property name="com.jaspersoft.studio.unit." value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageHeight" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.pageWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.topMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.bottomMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.leftMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.rightMargin" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnWidth" value="pixel"/>
+	<property name="com.jaspersoft.studio.unit.columnSpacing" value="pixel"/>
+	<style name="Marty">
+		<conditionalStyle mode="Opaque" forecolor="#030303" backcolor="#E0E0E0">
+			<conditionExpression><![CDATA[$V{REPORT_COUNT} % 2 == 0]]></conditionExpression>
+		</conditionalStyle>
+	</style>
+	<query language="SQL"><![CDATA[SELECT
+    l.id,
+    c.nome                          AS cliente,
+    b.codigo                        AS codigo_bicicleta,
+    l.data_hora_retirada,
+    l.data_hora_devolucao_efetiva,
+    l.status,
+    TIMESTAMPDIFF(MINUTE, l.data_hora_retirada,
+                  COALESCE(l.data_hora_devolucao_efetiva, NOW())) AS duracao_minutos
+FROM locacoes l
+JOIN clientes   c ON c.id = l.cliente_id
+JOIN bicicletas b ON b.id = l.bicicleta_id
+ORDER BY l.data_hora_retirada DESC]]></query>
+	<field name="id" class="java.lang.Long">
+		<property name="com.jaspersoft.studio.field.name" value="id"/>
+		<property name="com.jaspersoft.studio.field.label" value="id"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="locacoes"/>
+	</field>
+	<field name="cliente" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="nome"/>
+		<property name="com.jaspersoft.studio.field.label" value="cliente"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="clientes"/>
+	</field>
+	<field name="codigo_bicicleta" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="codigo"/>
+		<property name="com.jaspersoft.studio.field.label" value="codigo_bicicleta"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="bicicletas"/>
+	</field>
+	<field name="data_hora_retirada" class="java.time.LocalDateTime">
+		<property name="com.jaspersoft.studio.field.name" value="data_hora_retirada"/>
+		<property name="com.jaspersoft.studio.field.label" value="data_hora_retirada"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="locacoes"/>
+	</field>
+	<field name="data_hora_devolucao_efetiva" class="java.time.LocalDateTime">
+		<property name="com.jaspersoft.studio.field.name" value="data_hora_devolucao_efetiva"/>
+		<property name="com.jaspersoft.studio.field.label" value="data_hora_devolucao_efetiva"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="locacoes"/>
+	</field>
+	<field name="status" class="java.lang.String">
+		<property name="com.jaspersoft.studio.field.name" value="status"/>
+		<property name="com.jaspersoft.studio.field.label" value="status"/>
+		<property name="com.jaspersoft.studio.field.tree.path" value="locacoes"/>
+	</field>
+	<field name="duracao_minutos" class="java.lang.Long">
+		<property name="com.jaspersoft.studio.field.name" value="duracao_minutos"/>
+		<property name="com.jaspersoft.studio.field.label" value="duracao_minutos"/>
+	</field>
+	<background splitType="Stretch"/>
+	<title height="125" splitType="Stretch">
+		<element kind="staticText" uuid="2019241f-da7d-4a92-955f-faeceaeaa62a" x="280" y="0" width="199" height="120" backcolor="#E8CCC5" mode="Opaque" fontName="BankGothic Lt BT" fontSize="19.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[Relatório de locações e devoluções]]></text>
+		</element>
+		<element kind="image" uuid="856857bd-c556-4775-be69-0a537348bcf0" x="30" y="5" width="120" height="120" onErrorType="Blank">
+			<expression><![CDATA["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3NDk8eaIugAnOTxKJSbcMQTSbXWPz7XX19Jxu4Gxjaw&s=10"]]></expression>
+		</element>
+	</title>
+	<pageHeader height="40" splitType="Stretch">
+		<element kind="staticText" uuid="668982a9-198b-41fd-9f0f-ef3c5290dcd2" x="0" y="0" width="555" height="40" fontName="Arial" fontSize="16.0" hTextAlign="Center" vTextAlign="Middle">
+			<box>
+				<topPen lineWidth="1.0"/>
+				<bottomPen lineWidth="1.0"/>
+			</box>
+			<text><![CDATA[Tabela de Locações]]></text>
+		</element>
+	</pageHeader>
+	<columnHeader height="74" splitType="Stretch">
+		<element kind="staticText" uuid="3da864bd-d560-4437-9772-896671136e46" x="0" y="22" width="30" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="030b48e2-31ca-4e7c-aa30-9bcf89c3c878"/>
+			<text><![CDATA[id]]></text>
+		</element>
+		<element kind="staticText" uuid="68e34671-0189-46e3-8854-e9f305670b8f" x="30" y="22" width="105" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Left" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="5c983a39-1a98-463a-a55c-65cf39ba5a25"/>
+			<text><![CDATA[Cliente]]></text>
+		</element>
+		<element kind="staticText" uuid="8ae3cc29-b560-43d9-86b1-781d3fa4a263" x="135" y="22" width="70" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="99c08f1a-1ad1-45b0-a8f9-1bcf4c503d95"/>
+			<text><![CDATA[Bicicleta]]></text>
+		</element>
+		<element kind="staticText" uuid="8cddd5dc-1946-40e8-9b35-280198fbb577" x="205" y="22" width="100" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="a84f7afd-4234-4687-9ccd-dab1be6051ed"/>
+			<text><![CDATA[Retirada]]></text>
+		</element>
+		<element kind="staticText" uuid="10dd1eaf-4a06-45b6-9c79-4e1aadbfc841" x="305" y="22" width="100" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="27b6f86a-25db-4c6b-9f09-eaa1c9a9ec90"/>
+			<text><![CDATA[Devolução]]></text>
+		</element>
+		<element kind="staticText" uuid="9d5c7af7-4ba1-47a2-a0a6-60d51d3be55e" x="405" y="22" width="50" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="cad3d861-c25c-48ae-b767-983e6dd08d66"/>
+			<text><![CDATA[Tempo]]></text>
+		</element>
+		<element kind="staticText" uuid="b2da09a3-cc0e-48db-9b64-3ac5c32fb3d0" x="455" y="22" width="100" height="30" forecolor="#FFFFFF" backcolor="#807E79" mode="Opaque" fontName="Arial" fontSize="12.0" bold="true" hTextAlign="Center" vTextAlign="Middle">
+			<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="60c0ac5b-e0d8-4757-b9e3-395b12e13490"/>
+			<text><![CDATA[Status]]></text>
+		</element>
+	</columnHeader>
+	<detail>
+		<band height="30" splitType="Stretch">
+			<element kind="textField" uuid="47770d87-75b9-45fb-9aef-99c70983ca59" x="0" y="0" width="30" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="030b48e2-31ca-4e7c-aa30-9bcf89c3c878"/>
+				<expression><![CDATA[$F{id}]]></expression>
+			</element>
+			<element kind="textField" uuid="27d25b4e-129c-4422-a0d0-2585ecf59a82" x="30" y="0" width="105" height="30" forecolor="#030303" hTextAlign="Left" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="5c983a39-1a98-463a-a55c-65cf39ba5a25"/>
+				<expression><![CDATA[$F{cliente}]]></expression>
+			</element>
+			<element kind="textField" uuid="3d341799-f6e0-4fcd-82d4-c9247988ea4c" x="135" y="0" width="70" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="99c08f1a-1ad1-45b0-a8f9-1bcf4c503d95"/>
+				<expression><![CDATA[$F{codigo_bicicleta}]]></expression>
+			</element>
+			<element kind="textField" uuid="cb912206-5fd2-4b7a-ab48-5a1bb758ad74" x="205" y="0" width="100" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="a84f7afd-4234-4687-9ccd-dab1be6051ed"/>
+				<expression><![CDATA[$F{data_hora_retirada}.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))]]></expression>
+			</element>
+			<element kind="textField" uuid="311ba9cc-c9ff-4bef-8b75-6f8c9217b454" x="305" y="0" width="100" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="27b6f86a-25db-4c6b-9f09-eaa1c9a9ec90"/>
+				<expression><![CDATA[$F{data_hora_devolucao_efetiva} != null
+    ? $F{data_hora_devolucao_efetiva}.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
+    : "—"]]></expression>
+			</element>
+			<element kind="textField" uuid="372afb75-df8e-4e17-b02d-fd354f6ccab0" x="405" y="0" width="50" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="cad3d861-c25c-48ae-b767-983e6dd08d66"/>
+				<expression><![CDATA[$F{duracao_minutos} != null
+    ? String.format("%02d:%02d", $F{duracao_minutos} / 60, $F{duracao_minutos} % 60)
+    : "00:00"]]></expression>
+			</element>
+			<element kind="textField" uuid="1c0e9875-4836-4575-a95c-3c1cfe69120c" x="455" y="0" width="100" height="30" forecolor="#030303" hTextAlign="Center" vTextAlign="Middle" style="Marty">
+				<property name="com.jaspersoft.studio.spreadsheet.connectionID" value="60c0ac5b-e0d8-4757-b9e3-395b12e13490"/>
+				<expression><![CDATA["ATIVA".equals($F{status}) ? "Em andamento" : "Finalizada"]]></expression>
+			</element>
+		</band>
+	</detail>
+	<columnFooter height="39" splitType="Stretch">
+		<element kind="staticText" uuid="9caac6c2-dc4b-49e7-b3be-11b3b1e84c9e" x="0" y="0" width="555" height="39" hTextAlign="Center" vTextAlign="Middle">
+			<text><![CDATA[© 2026 API+BIKES. Todos os direitos reservados.  IFC-Videira]]></text>
+		</element>
+	</columnFooter>
+	<pageFooter height="30" splitType="Stretch">
+		<element kind="textField" uuid="8e970bad-eaf4-4413-833d-56f7f35f5708" x="450" y="0" width="70" height="30" hTextAlign="Right">
+			<expression><![CDATA["Página " + $V{PAGE_NUMBER}]]></expression>
+		</element>
+		<element kind="textField" uuid="e7741a67-dd5b-4d01-9e1a-de9fbb27cf62" x="520" y="0" width="30" height="30" evaluationTime="Report" hTextAlign="Right">
+			<expression><![CDATA[" de " + $V{PAGE_NUMBER}]]></expression>
+		</element>
+		<element kind="textField" uuid="5354288f-d886-4d15-9a1c-511aef5cd161" x="0" y="0" width="220" height="30">
+			<expression><![CDATA[new java.text.SimpleDateFormat("dd 'de' MMMM 'de' yyyy", new java.util.Locale("pt", "BR")).format(new java.util.Date())]]></expression>
+		</element>
+	</pageFooter>
+	<summary height="42" splitType="Stretch"/>
+</jasperReport>
