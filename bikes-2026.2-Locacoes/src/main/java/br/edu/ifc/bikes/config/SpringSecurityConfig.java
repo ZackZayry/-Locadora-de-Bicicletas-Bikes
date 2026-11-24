@@ -20,6 +20,15 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 @Configuration
 public class SpringSecurityConfig {
 
+      private static final String[] DOCUMENTATION_OPENAPI = {
+            "/docs-bikes.html",
+            "/docs-bikes",
+            "/docs-bikes/**",
+            "/swagger-ui.html",
+            "/swagger-ui/**",
+            "/webjars/**"
+    };
+    
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthorizationFilter jwtAuthorizationFilter) throws Exception{
         return http
