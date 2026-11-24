@@ -20,7 +20,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 @Configuration
 public class SpringSecurityConfig {
 
-      private static final String[] DOCUMENTATION_OPENAPI = {
+    private static final String[] DOCUMENTATION_OPENAPI = {
             "/docs-bikes.html",
             "/docs-bikes",
             "/docs-bikes/**",
@@ -28,33 +28,34 @@ public class SpringSecurityConfig {
             "/swagger-ui/**",
             "/webjars/**"
     };
-    
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthorizationFilter jwtAuthorizationFilter) throws Exception{
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthorizationFilter jwtAuthorizationFilter) throws Exception {
         return http
-                .csrf(csrf->csrf.disable())
-                .formLogin(form->form.disable())
-                .httpBasic(basic->basic.disable())
+                .csrf(csrf -> csrf.disable())
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/api/v1/usuarios").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth").permitAll()
+                        .requestMatchers(DOCUMENTATION_OPENAPI).permitAll()
                         // sem isso, qualquer erro "repassado" ao /error (404, 415, 500...) vira 403 e esconde o erro real
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated()
                 ).sessionManagement(
-                        session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 ).addFilterBefore(
                         jwtAuthorizationFilter, UsernamePasswordAuthenticationFilter.class
                 ).build();
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder(){
+    public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception{
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
